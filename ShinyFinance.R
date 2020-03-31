@@ -87,6 +87,11 @@ asset_returns_long %>% ggplot(aes(x = returns)) + geom_density(aes(color = asset
   facet_wrap(~asset) + ggtitle("Monthly Returns Since 2013") + xlab("monthly returns") + ylab("distribution") + 
   theme_update(plot.title = element_text(hjust = 0.5))
 
+asset_returns_long %>% group_by(asset) %>% mutate(weights = case_when(asset == symbols[1] ~ w[1],
+                                                                      asset == symbols[2] ~w[2],
+                                                                      asset == symbols[3] ~w[3],
+                                                                      asset == symbols[4] ~w[4],
+                                                                      asset == symbols[5] ~ w[5])) %>% head(3)
 # ------------------------------------------------------------------
 
 # ----------------------- Tidyquant --------------------------------

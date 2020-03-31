@@ -1,0 +1,29 @@
+---
+title: "Portfolio"
+author: "Homi"
+date: "3/30/2020"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r}
+# Setup chunk
+library(tidyverse)
+library(highcharter)
+library(tidyquant)
+library(timetk)
+```
+
+```{r}
+fluidRow(
+  column(1,
+  textInput("stock1","Stock 1","SPY")),
+  column(2,
+  numericInput("w1","Portf. %",25,min=1,max=100))
+)
+```
+
+
+
