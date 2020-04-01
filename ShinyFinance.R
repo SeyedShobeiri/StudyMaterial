@@ -64,6 +64,16 @@ map(1:5,hc_hist_fun,asset_returns_xts,"blue")
 
 portfolio_returns_xts_rebalanced_monthly = Return.portfolio(asset_returns_xts,weights = w, rebalance_on = "months") %>% 'colnames<-'("returns")
 head(portfolio_returns_xts_rebalanced_monthly,3)
+
+highchart(type="stock") %>% hc_title(text = "Portfolio Monthly Returns") %>% hc_add_series(portfolio_returns_xts_rebalanced_monthly$returns,
+                                                                                           name = "Rebalanced Monthly",
+                                                                                           color = "cornflowerblue") %>% 
+  hc_add_theme(hc_theme_flat()) %>% hc_navigator(enabled = FALSE) %>% hc_scrollbar(enabled = FALSE) %>% hc_legend(enabled = TRUE) %>% hc_exporting(enabled = TRUE)
+
+hc_portfolio = hist(portfolio_returns_xts_rebalanced_monthly$returns, breaks = 50,plot = FALSE)
+hchart(hc_portfolio,color = "cornflowerblue",name = "Portfolio") %>% hc_title(text = "Portfolio Returns Distribution") %>% 
+  hc_add_theme(hc_theme_flat()) %>% hc_exporting(enabled = TRUE)
+
 # -----------------------------------------------------------------
 
 # ----------------------- Tidyverse -------------------------------
@@ -92,6 +102,38 @@ asset_returns_long %>% group_by(asset) %>% mutate(weights = case_when(asset == s
                                                                       asset == symbols[3] ~w[3],
                                                                       asset == symbols[4] ~w[4],
                                                                       asset == symbols[5] ~ w[5])) %>% head(3)
+
+portfolio_returns_dplyr_byhand = asset_returns_long %>% group_by(asset) %>% mutate(weights = case_when(asset == symbols[1] ~ w[1],
+                                                                                                       asset == symbols[2] ~w[2],
+                                                                                                       asset == symbols[3] ~w[3],
+                                                                                                       asset == symbols[4] ~w[4],
+                                                                                                       asset == symbols[5] ~ w[5]),
+                                                                                                       weighted_returns = returns * weights) %>% 
+                                                                                     group_by(date) %>% 
+                                                                                     summarise(returns = sum(weighted_returns))
+head(portfolio_returns_dplyr_byhand,3)
+
+portfolio_returns_tq_rebalanced_monthly %>% ggplot(aes(x=date,y=returns)) + geom_point(colour = "cornflowerblue") +
+  xlab("date") + ylab("monthly return") + theme_update(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Portfolio Returns Scatter") + scale_x_date(breaks = pretty_breaks(n=6))
+
+portfolio_returns_tq_rebalanced_monthly %>% ggplot(aes(x=returns)) + geom_histogram(binwidth = 0.005,
+                                                                                    fill = "cornflowerblue",
+                                                                                    color = "cornflowerblue") +
+  ggtitle("Portfolio Returns Distribution") + theme_update(plot.title = element_text(hjust = 0.5))
+
+asset_returns_long %>% ggplot(aes(x=returns,fill = asset)) + geom_histogram(alpha=0.15,binwidth = 0.01) + 
+  geom_histogram(data = portfolio_returns_tq_rebalanced_monthly,fill = "cornflowerblue", binwidth = 0.01) +
+  ggtitle("Portfolio and Asset Monthly Returns") + theme_update(plot.title = element_text(hjust = 0.5))
+
+portfolio_returns_tq_rebalanced_monthly %>% ggplot(aes(x=returns)) + geom_histogram(binwidth = 0.01,colour = "cornflowerblue",
+                                                                                    fill = "cornflowerblue")+
+  geom_density(alpha = 1,color = "red") +xlab("monthly returns") + ylab("distribution") + theme_update(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Portfolio Histogram and Density")
+
+
+
+                                                                                   
 # ------------------------------------------------------------------
 
 # ----------------------- Tidyquant --------------------------------
@@ -101,6 +143,18 @@ asset_returns_tq_builtin = prices %>% tk_tbl(preserve_index = TRUE,rename_index 
                                                                     select(date,symbols) %>% slice(-1)
 
 head(asset_returns_tq_builtin,3)
+
+portfolio_returns_tq_rebalanced_monthly = asset_returns_long %>% 
+  tq_portfolio(assets_col = asset,returns_col = returns,weights = w, col_rename = "returns",rebalance_on = "months")
+
+portfolio_returns_dplyr_byhand %>% rename(tidyverse = returns) %>% mutate(equation = coredata(portfolio_returns_byhand),
+                                                                          tq = portfolio_returns_tq_rebalanced_monthly$returns,
+                                                                          xts = coredata(portfolio_returns_xts_rebalanced_monthly)) %>%
+  mutate_if(is.numeric,funs(round(.,3))) %>% head(3)
+
+
+
+
 # -------------------------------------------------------------------
 
 #------------------------- tibbletime -------------------------------
