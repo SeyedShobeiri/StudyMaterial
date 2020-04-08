@@ -78,6 +78,36 @@ portfolio_sd_xts_builtin = StdDev(asset_returns_xts,weights = w)
 portfolio_sd_xts_builtin_percent = round(portfolio_sd_xts_builtin*100,2)
 portfolio_sd_xts_builtin_percent[1,1]
 
+window = 24
+port_rolling_sd_xts = rollapply(portfolio_returns_xts_rebalanced_monthly,FUN = sd,width = window) %>% na.omit() %>% 
+  'colnames<-'("rolling_sd")
+
+tail(port_rolling_sd_xts,3)
+
+skew_xts = skewness(portfolio_returns_xts_rebalanced_monthly$returns)
+skew_xts
+
+
+window <- 24
+rolling_skew_xts <-
+  rollapply(portfolio_returns_xts_rebalanced_monthly,
+            FUN = skewness,
+            width = window) %>%
+  na.omit()
+
+kurt_xts <-
+  kurtosis(portfolio_returns_xts_rebalanced_monthly$returns)
+
+window <- 24
+rolling_kurt_xts <-
+  rollapply(portfolio_returns_xts_rebalanced_monthly,
+            FUN = kurtosis,width = window) %>%
+  na.omit()
+
+
+
+
+
 
 
 # -----------------------------------------------------------------
@@ -144,12 +174,74 @@ portfolio_sd_tidy_builtin_percent = portfolio_returns_dplyr_byhand %>% summarise
 
 portfolio_sd_tidy_builtin_percent %>% select(dplyr,dplyr_byhand)
 
+port_rolling_sd_tidy_does_not_work = portfolio_returns_dplyr_byhand %>% mutate(rolling_sd = rollapply(returns,
+                                                                                                      FUN = sd,
+                                                                                                      width = window,
+                                                                                                      fill = NA)) %>%
+  
+  select(date,rolling_sd) %>% na.omit()
+
+tail(port_rolling_sd_tidy_does_not_work,3)
+
+sd_roll_24 = rollify(sd,window = window)
+port_rolling_sd_tidy_tibbletime = portfolio_returns_tq_rebalanced_monthly %>% as_tbl_time(index = date) %>% 
+  mutate(sd = sd_roll_24(returns)) %>% select(-returns) %>% na.omit()
+
+tail(port_rolling_sd_tidy_tibbletime,3)
+
+skew_tidy = portfolio_returns_tq_rebalanced_monthly %>% summarise(skewness = skewness(returns))
+skew_tidy
+skew_tidy %>% mutate(xts = coredata(skew_xts))%>%mutate_all(funs(round(.,3)))
+
+skew_roll_24 <-
+  rollify(skewness, window = window)
+roll_skew_tibbletime <-
+  portfolio_returns_tq_rebalanced_monthly %>%
+  as_tbl_time(index = date) %>%
+  mutate(skew = skew_roll_24(returns)) %>%
+  select(-returns) %>%
+  na.omit()
+
+kurt_tidy <-
+  portfolio_returns_tq_rebalanced_monthly %>%
+  summarise(
+    kurt_builtin = kurtosis(returns),
+    kurt_byhand =
+      ((sum((returns - mean(returns))^4)/
+          length(returns))/
+         ((sum((returns - mean(returns))^2)/
+             length(returns))^2)) - 3) %>%
+  select(kurt_builtin, kurt_byhand)
+
+
+kurt_tidy %>%
+  mutate(xts = kurt_xts)
+
+kurt_roll_24 <-
+  rollify(kurtosis,
+          window = window)
+roll_kurt_tibbletime <-
+  portfolio_returns_tq_rebalanced_monthly %>%
+  as_tbl_time(index = date) %>%
+  mutate(kurt = kurt_roll_24(returns)) %>%
+  select(-returns) %>%
+  na.omit()
 
 
 
 
 
-                                                                                   
+
+
+
+
+
+
+
+
+
+
+                                                                                 
 # ------------------------------------------------------------------
 
 # ----------------------- Tidyquant --------------------------------
@@ -174,6 +266,53 @@ portfolio_sd_tidyquant_builtin_percent = portfolio_returns_tq_rebalanced_monthly
 
 portfolio_sd_tidy_builtin_percent %>% select(dplyr,dplyr_byhand) %>% mutate(xts_builtin = portfolio_sd_xts_builtin_percent,
                                                                             matrix = sd_matrix_algebra_percent,tq = portfolio_sd_tidyquant_builtin_percent$tq_sd)
+
+port_rolling_sd_tq = portfolio_returns_tq_rebalanced_monthly %>% tq_mutate(mutate_fun = rollapply,
+                                                                           width = window,
+                                                                           FUN = sd,
+                                                                           col_rename = "rolling_sd") %>%
+  select(date,rolling_sd) %>% na.omit()
+
+port_rolling_sd_tidy_tibbletime %>% mutate(sd_tq = port_rolling_sd_tq$rolling_sd,
+                                           sd_xts = round(port_rolling_sd_xts$rolling_sd,4)) %>% tail(3)
+
+
+rolling_skew_tq <-
+  portfolio_returns_tq_rebalanced_monthly %>%
+  tq_mutate(select = returns,
+            mutate_fun = rollapply,
+            width = window,
+            FUN = skewness,
+            col_rename = "tq") %>%
+  na.omit()
+
+rolling_skew_tq %>%
+  select(-returns) %>%
+  mutate(xts = coredata(rolling_skew_xts),
+         tbltime = roll_skew_tibbletime$skew) %>%
+  mutate_if(is.numeric, funs(round(., 3))) %>%
+  tail(3)
+
+rolling_kurt_tq <-
+  portfolio_returns_tq_rebalanced_monthly %>%
+  tq_mutate(select = returns,
+            mutate_fun = rollapply,
+            width = window,
+            FUN = kurtosis,
+            col_rename = "tq") %>%
+  select(-returns) %>%
+  na.omit()
+
+rolling_kurt_tq %>%
+  mutate(xts = coredata(rolling_kurt_xts),
+         tbltime = roll_kurt_tibbletime$kurt) %>%
+  mutate_if(is.numeric, funs(round(.,3))) %>%
+  tail(3)
+
+
+
+
+
 
 # -------------------------------------------------------------------
 
@@ -275,6 +414,260 @@ portfolio_returns_tq_rebalanced_monthly %>% mutate(hist_col_red =
     # The next line centers the title
     theme_update(plot.title = element_text(hjust = 0.5))
   
+
+
+portfolio_rolling_sd_xts_hc = round(port_rolling_sd_xts,4) * 100
+highchart(type = "stock") %>% hc_title(text = "24-Month Rolling Volatility") %>% 
+  hc_add_series(portfolio_rolling_sd_xts_hc,color="cornflowerblue") %>% hc_add_theme(hc_theme_flat()) %>% 
+  hc_yAxis(
+    labels = list(format = "{value}%"),opposite = FALSE) %>% hc_navigator(enabled = FALSE) %>% hc_scrollbar(enabled = FALSE) %>% 
+  hc_exporting(enabled = TRUE) %>% hc_legend(enabled = TRUE)
+
+port_rolling_sd_tq %>% ggplot(aes(x=date)) + geom_line(aes(y=rolling_sd),color = "cornflowerblue") +
+  scale_y_continuous(labels = scales::percent) + scale_x_date(breaks = pretty_breaks(n=8)) + 
+  labs(title = "Rolling Standard Deviation", y = " ") + theme(plot.title = element_text(hjust = 0.5))
+
+portfolio_returns_tq_rebalanced_monthly %>%
+  ggplot(aes(x = returns)) +
+  geom_histogram(alpha = .7,
+                 binwidth = .003,
+                 fill = "cornflowerblue",
+                 color = "cornflowerblue") +
+  scale_x_continuous(breaks =
+                       pretty_breaks(n = 10))
+
+
+portfolio_returns_tq_rebalanced_monthly %>%
+  mutate(hist_col_red =
+           if_else(returns < (mean(returns) - 2*sd(returns)),
+                   returns, as.numeric(NA)),
+         returns =
+           if_else(returns > (mean(returns) - 2*sd(returns)),
+                   returns, as.numeric(NA))) %>%
+  ggplot() +
+  geom_histogram(aes(x = hist_col_red),
+                 alpha = .7,
+                 binwidth = .003,
+                 fill = "red",
+                 color = "red") +
+  geom_histogram(aes(x = returns),
+                 alpha = .7,
+                 binwidth = .003,
+                 fill = "cornflowerblue",
+                 color = "cornflowerblue") +
+  scale_x_continuous(breaks = pretty_breaks(n = 10)) +
+  xlab("monthly returns")
+
+portfolio_density_plot <-
+  portfolio_returns_tq_rebalanced_monthly %>%
+  ggplot(aes(x = returns)) +
+  stat_density(geom = "line",
+               alpha = 1,
+               colour = "cornflowerblue")
+portfolio_density_plot
+
+
+shaded_area_data <-
+  ggplot_build(portfolio_density_plot)$data[[1]] %>%
+  filter(x <
+           mean(portfolio_returns_tq_rebalanced_monthly$returns))
+portfolio_density_plot_shaded <-
+  portfolio_density_plot +
+  geom_area(data = shaded_area_data,
+            aes(x = x, y = y),
+            fill="pink",
+            alpha = 0.5)
+portfolio_density_plot_shaded
+
+
+median = median(portfolio_returns_tq_rebalanced_monthly$returns)
+mean = mean(portfolio_returns_tq_rebalanced_monthly$returns)
+
+
+median_line_data = ggplot_build(portfolio_density_plot)$data[[1]] %>% filter(x <= mean)
+
+portfolio_density_plot_shaded +
+geom_segment(data = shaded_area_data,
+             aes(x = mean,
+                 y = 0,
+                 xend = mean,
+                 yend = density),
+             color = "red",
+             linetype = "dotted") +
+  annotate(geom = "text",
+           x = mean,
+           y = 5,
+           label = "mean",
+           color = "red",
+           fontface = "plain",
+           angle = 90,
+           alpha = .8,
+           vjust = -1.75) +
+  geom_segment(data = median_line_data,
+               aes(x = median,
+                   y = 0,
+                   xend = median,
+                   yend = density),
+               color = "black",
+               linetype = "dotted") +
+  annotate(geom = "text",
+           x = median,
+           y = 5,
+           label = "median",
+           fontface = "plain",
+           angle = 90,
+           alpha = .8,
+           vjust = 1.75) +
+  ggtitle("Density Plot Illustrating Skewness")
+
+
+asset_returns_long %>%
+  summarize(skew_assets = skewness(returns)) %>%
+  add_row(asset = "Portfolio",
+          skew_assets = skew_tidy$skew_byhand)%>%
+  ggplot(aes(x = asset,
+             y = skew_assets,
+             colour = asset)) +
+  geom_point() +
+  geom_text(aes(x = "Portfolio",
+                y =
+                  skew_tidy$skew_builtin + .04),
+            label = "Portfolio",
+            color = "cornflowerblue") +
+  labs(y = "skewness")
+
+
+highchart(type = "stock") %>%
+  hc_title(text = "Rolling 24-Month Skewness") %>%
+  hc_add_series(rolling_skew_xts,
+                name = "Rolling skewness",
+                color = "cornflowerblue") %>%
+  hc_yAxis(title = list(text = "skewness"),
+           opposite = FALSE, max = 1,
+           min = -1) %>%
+  hc_navigator(enabled = FALSE) %>%
+  hc_scrollbar(enabled = FALSE) %>%
+  hc_add_theme(hc_theme_flat()) %>%
+  hc_exporting(enabled = TRUE)
+
+
+rolling_skew_tq %>%
+  ggplot(aes(x = date, y = tq)) +
+  geom_line(color = "cornflowerblue") +
+  ggtitle("Rolling 24-Month Skew ") +
+  ylab(paste("Rolling ", window, " month skewness",
+             sep = " ")) +
+  scale_y_continuous(limits = c(-1, 1),
+                     breaks = pretty_breaks(n = 8)) +
+  scale_x_date(breaks = pretty_breaks(n = 8)) +
+  theme_update(plot.title = element_text(hjust = 0.5))
+
+sd_pos <-
+  mean + (2* sd(portfolio_returns_tq_rebalanced_monthly$returns))
+sd_neg <-
+  mean - (2* sd(portfolio_returns_tq_rebalanced_monthly$returns))
+sd_pos_shaded_area <-
+  ggplot_build(portfolio_density_plot)$data[[1]] %>%
+  filter(x > sd_pos )
+sd_neg_shaded_area <-
+  ggplot_build(portfolio_density_plot)$data[[1]] %>%
+  filter(x < sd_neg)
+portfolio_density_plot +
+  geom_area(data = sd_pos_shaded_area,
+            aes(x = x, y = y),
+            fill="pink",
+            alpha = 0.5) +
+  geom_area(data = sd_neg_shaded_area,
+            aes(x = x, y = y),
+            fill="pink",
+            alpha = 0.5) +
+  scale_x_continuous(breaks = pretty_breaks(n = 10))
+
+
+portfolio_density_plot +
+  geom_area(data = sd_pos_shaded_area,
+            aes(x = x, y = y),
+            fill="pink",
+            alpha = 0.5) +
+  geom_area(data = sd_neg_shaded_area,
+            aes(x = x, y = y),
+            fill="pink",
+            alpha = 0.5) +
+  geom_segment(data = shaded_area_data,
+               aes(x = mean,
+                   y = 0,
+                   xend = mean,
+                   yend = density),
+               color = "red",
+               linetype = "dotted") +
+  annotate(geom = "text",
+           x = mean,
+           y = 5,
+           label = "mean",
+           color = "red",
+           fontface = "plain",
+           angle = 90,
+           alpha = .8,
+           vjust = -1.75) +
+  geom_segment(data = median_line_data,
+               aes(x = median,
+                   y = 0,
+                   xend = median,
+                   yend = density),
+               color = "black",
+               linetype = "dotted") +
+  annotate(geom = "text",
+           x = median,
+           y = 5,
+           label = "median",
+           fontface = "plain",
+           angle = 90,
+           alpha = .8,
+           vjust = 1.75) +
+  scale_x_continuous(breaks = pretty_breaks(n = 10))
+
+
+asset_returns_long %>%
+  summarize(kurt_assets = kurtosis(returns)) %>%
+  add_row(asset = "Portfolio",
+          kurt_assets = kurt_tidy$kurt_byhand) %>%
+  ggplot(aes(x = asset,
+             y = kurt_assets,
+             colour = asset)) +
+  geom_point() +
+  geom_text(
+    aes(x = "Portfolio",
+        y =
+          kurt_tidy$kurt_byhand + .06),
+    label = "Portfolio",
+    color = "cornflowerblue") +
+  labs(y = "kurtosis")
+
+
+highchart(type = "stock") %>%
+  hc_title(text = "Rolling 24-Month kurtosis") %>%
+  hc_add_series(rolling_kurt_xts,
+                name = "Rolling 24-Month kurtosis",
+                color = "cornflowerblue") %>%
+  hc_yAxis(title = list(text = "kurtosis"),
+           opposite = FALSE) %>%
+  hc_add_theme(hc_theme_flat()) %>%
+  hc_navigator(enabled = FALSE) %>%
+  hc_scrollbar(enabled = FALSE) %>%
+  hc_exporting(enabled = TRUE)
+
+rolling_kurt_tq %>%
+  ggplot(aes(x = date, y = tq)) +
+  geom_line(color = "cornflowerblue") +
+  scale_y_continuous(breaks = pretty_breaks(n = 8)) +
+  scale_x_date(breaks = pretty_breaks(n = 8)) +
+  ggtitle("Rolling 24-Month Kurtosis") +
+  labs(y = "rolling kurtosis") +
+  theme_update(plot.title = element_text(hjust = 0.5))
+
+
+
+
 
 
 
