@@ -1,6 +1,6 @@
 library(tidyverse)
 library(hms)
-
+library(nycflights13)
 as_tibble(iris)
 
 tibble(x = 1:5,y=1,z=x^2 + y)
@@ -48,4 +48,30 @@ who5
 
 who6 = who %>% gather(code,value,new_sp_m014:newrel_f65,na.rm = TRUE)
 who6
+
+
+planes %>% count(tailnum) %>% filter(n>1)
+
+flights2 = flights %>% select(year:day,hour,origin,dest,tailnum,carrier)
+view(flights2)
+
+flights2 %>% select(-origin,-dest) %>% left_join(airlines,by = "carrier")
+
+
+library(stringr)
+
+double_quote = "\""
+double_quote
+
+str_c(c("x","y","z"),collapse = ", ")
+
+x = c("apple","banana","pear")
+str_view(x,"an")
+str_view(x,".a.")
+
+library(forcats)
+
+gss_cat
+
+
 
