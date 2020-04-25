@@ -1,0 +1,55 @@
+---
+title: "Untitled"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    source_code : "https://github.com"
+    storyboard: true
+    theme: lumen
+---
+
+Monthly deaths from bronchitis, emphysema and asthma in the
+UK, 1974–1979 (Source: P. J. Diggle, 1990, Time Series: A
+Biostatistical Introduction. Oxford, table A.3)
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(DT)
+```
+
+Page 1
+======================================================================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A {data-padding = 20}
+
+```{r, shiny}
+DT::datatable(mtcars,options = list(bPaginate = FALSE))
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+
+```
+
+### Chart C
+
+```{r}
+
+```
+
+Page 2
+=========================================================================
+
+### About dygraphs
+This example makes use of the dygraphs R package. The dygraphs
+package provides rich facilities for charting time-series data
+in R. You can use dygraphs at the R console, within R Markdown
+documents, and within Shiny applications.
